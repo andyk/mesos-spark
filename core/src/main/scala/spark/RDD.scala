@@ -111,7 +111,7 @@ abstract class RDD[T: ClassManifest](@transient sc: SparkContext) extends Serial
    * Set this RDD's storage level to persist its values across operations after the first time
    * it is computed. Can only be called once on each RDD.
    */
-  def persist(newLevel: StorageLevel): RDD[T] = {
+  def persist(newLevel: StorageLevel): this.type = {
     // TODO: Handle changes of StorageLevel
     if (storageLevel != StorageLevel.NONE && newLevel != storageLevel) {
       throw new UnsupportedOperationException(
@@ -122,10 +122,10 @@ abstract class RDD[T: ClassManifest](@transient sc: SparkContext) extends Serial
   }
 
   /** Persist this RDD with the default storage level (MEMORY_ONLY). */
-  def persist(): RDD[T] = persist(StorageLevel.MEMORY_ONLY)
+  def persist(): this.type = persist(StorageLevel.MEMORY_ONLY)
   
   /** Persist this RDD with the default storage level (MEMORY_ONLY). */
-  def cache(): RDD[T] = persist()
+  def cache(): this.type = persist()
 
   /** Get the RDD's current storage level, or StorageLevel.NONE if none is set. */
   def getStorageLevel = storageLevel

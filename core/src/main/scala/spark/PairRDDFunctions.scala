@@ -48,6 +48,10 @@ class PairRDDFunctions[K: ClassManifest, V: ClassManifest](
   extends Logging
   with Serializable {
 
+  def index(): IndexedRDD[K,V] = {
+    new IndexedRDD(self)
+  }
+
   /**
    * Generic function to combine the elements for each key using a custom set of aggregation 
    * functions. Turns an RDD[(K, V)] into a result of type RDD[(K, C)], for a "combined type" C
