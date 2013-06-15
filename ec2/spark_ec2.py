@@ -34,11 +34,14 @@ import boto
 from boto.ec2.blockdevicemapping import BlockDeviceMapping, EBSBlockDeviceType, BlockDeviceType
 from boto import ec2
 
+logging.basicConfig(filename="boto.log", level=logging.DEBUG)
+
 # A static URL from which to figure out the latest Mesos EC2 AMI
 LATEST_AMI_URL = "https://s3.amazonaws.com/mesos-images/ids/latest-spark-0.6"
+EC2_API_VERSION = "2010-08-31"
 
 # Static url to a script used to bootstrap the setup process
-SETUP_BOOTSTRAP_URL = "https://raw.github.com/shivaram/spark-ec2/from-scratch/setup-root-access.sh"
+SETUP_BOOTSTRAP_URL = "https://raw.github.com/andyk/spark-ec2/from-scratch/setup-root-access.sh"
 
 # Configure and parse our command-line arguments
 def parse_args():
@@ -94,6 +97,8 @@ def parse_args():
       "will not be setup with this option")
   parser.add_option("-u", "--user", default="root",
       help="The ssh user you want to connect as (default: root)")
+  parser.add_option("--initial-user", default="ec2-user",
+      help="The ssh user required to login initially (default: ec2-user)")
   parser.add_option("--delete-groups", action="store_true", default=False,
       help="When destroying a cluster, also destroy the security groups that were created")
             
@@ -163,40 +168,43 @@ def is_active(instance):
 # Fails if there already instances running in the cluster's groups.
 def launch_cluster(conn, opts, cluster_name):
   print "Setting up security groups..."
-  master_group = get_or_make_group(conn, cluster_name + "-master")
-  slave_group = get_or_make_group(conn, cluster_name + "-slaves")
-  zoo_group = get_or_make_group(conn, cluster_name + "-zoo")
-  if master_group.rules == []: # Group was just now created
-    master_group.authorize(src_group=master_group)
-    master_group.authorize(src_group=slave_group)
-    master_group.authorize(src_group=zoo_group)
-    master_group.authorize('tcp', 22, 22, '0.0.0.0/0')
-    master_group.authorize('tcp', 8080, 8081, '0.0.0.0/0')
-    master_group.authorize('tcp', 50030, 50030, '0.0.0.0/0')
-    master_group.authorize('tcp', 50070, 50070, '0.0.0.0/0')
-    master_group.authorize('tcp', 60070, 60070, '0.0.0.0/0')
-    if opts.cluster_type == "mesos":
-      master_group.authorize('tcp', 38090, 38090, '0.0.0.0/0')
-    if opts.ganglia:
-      master_group.authorize('tcp', 80, 80, '0.0.0.0/0')
-  if slave_group.rules == []: # Group was just now created
-    slave_group.authorize(src_group=master_group)
-    slave_group.authorize(src_group=slave_group)
-    slave_group.authorize(src_group=zoo_group)
-    slave_group.authorize('tcp', 22, 22, '0.0.0.0/0')
-    slave_group.authorize('tcp', 8080, 8081, '0.0.0.0/0')
-    slave_group.authorize('tcp', 50060, 50060, '0.0.0.0/0')
-    slave_group.authorize('tcp', 50075, 50075, '0.0.0.0/0')
-    slave_group.authorize('tcp', 60060, 60060, '0.0.0.0/0')
-    slave_group.authorize('tcp', 60075, 60075, '0.0.0.0/0')
-  if zoo_group.rules == []: # Group was just now created
-    zoo_group.authorize(src_group=master_group)
-    zoo_group.authorize(src_group=slave_group)
-    zoo_group.authorize(src_group=zoo_group)
-    zoo_group.authorize('tcp', 22, 22, '0.0.0.0/0')
-    zoo_group.authorize('tcp', 2181, 2181, '0.0.0.0/0')
-    zoo_group.authorize('tcp', 2888, 2888, '0.0.0.0/0')
-    zoo_group.authorize('tcp', 3888, 3888, '0.0.0.0/0')
+  # master_group = get_or_make_group(conn, cluster_name + "-master")
+  # slave_group = get_or_make_group(conn, cluster_name + "-slaves")
+  # zoo_group = get_or_make_group(conn, cluster_name + "-zoo")
+  master_group = get_or_make_group(conn, "default")
+  slave_group = get_or_make_group(conn, "default")
+  zoo_group = get_or_make_group(conn, "default")
+  # if master_group.rules == []: # Group was just now created
+  #   master_group.authorize(src_group=master_group)
+  #   master_group.authorize(src_group=slave_group)
+  #   master_group.authorize(src_group=zoo_group)
+  #   master_group.authorize('tcp', 22, 22, '0.0.0.0/0')
+  #   master_group.authorize('tcp', 8080, 8081, '0.0.0.0/0')
+  #   master_group.authorize('tcp', 50030, 50030, '0.0.0.0/0')
+  #   master_group.authorize('tcp', 50070, 50070, '0.0.0.0/0')
+  #   master_group.authorize('tcp', 60070, 60070, '0.0.0.0/0')
+  #   if opts.cluster_type == "mesos":
+  #     master_group.authorize('tcp', 38090, 38090, '0.0.0.0/0')
+  #   if opts.ganglia:
+  #     master_group.authorize('tcp', 80, 80, '0.0.0.0/0')
+  # if slave_group.rules == []: # Group was just now created
+  #   slave_group.authorize(src_group=master_group)
+  #   slave_group.authorize(src_group=slave_group)
+  #   slave_group.authorize(src_group=zoo_group)
+  #   slave_group.authorize('tcp', 22, 22, '0.0.0.0/0')
+  #   slave_group.authorize('tcp', 8080, 8081, '0.0.0.0/0')
+  #   slave_group.authorize('tcp', 50060, 50060, '0.0.0.0/0')
+  #   slave_group.authorize('tcp', 50075, 50075, '0.0.0.0/0')
+  #   slave_group.authorize('tcp', 60060, 60060, '0.0.0.0/0')
+  #   slave_group.authorize('tcp', 60075, 60075, '0.0.0.0/0')
+  # if zoo_group.rules == []: # Group was just now created
+  #   zoo_group.authorize(src_group=master_group)
+  #   zoo_group.authorize(src_group=slave_group)
+  #   zoo_group.authorize(src_group=zoo_group)
+  #   zoo_group.authorize('tcp', 22, 22, '0.0.0.0/0')
+  #   zoo_group.authorize('tcp', 2181, 2181, '0.0.0.0/0')
+  #   zoo_group.authorize('tcp', 2888, 2888, '0.0.0.0/0')
+  #   zoo_group.authorize('tcp', 3888, 3888, '0.0.0.0/0')
 
   # Check if instances are already running in our groups
   active_nodes = get_existing_cluster(conn, opts, cluster_name,
@@ -258,8 +266,8 @@ def launch_cluster(conn, opts, cluster_name):
           count = num_slaves_this_zone,
           key_name = opts.key_pair,
           security_groups = [slave_group],
-          instance_type = opts.instance_type,
-          block_device_map = block_map)
+          instance_type = opts.instance_type)#,
+          #block_device_map = block_map)
       my_req_ids += [req.id for req in slave_reqs]
       i += 1
     
@@ -309,8 +317,8 @@ def launch_cluster(conn, opts, cluster_name):
                               instance_type = opts.instance_type,
                               placement = zone,
                               min_count = num_slaves_this_zone,
-                              max_count = num_slaves_this_zone,
-                              block_device_map = block_map)
+                              max_count = num_slaves_this_zone)#,
+                              #block_device_map = block_map)
         slave_nodes += slave_res.instances
         print "Launched %d slaves in %s, regid = %s" % (num_slaves_this_zone,
                                                         zone, slave_res.id)
@@ -327,8 +335,8 @@ def launch_cluster(conn, opts, cluster_name):
                          instance_type = master_type,
                          placement = opts.zone,
                          min_count = 1,
-                         max_count = 1,
-                         block_device_map = block_map)
+                         max_count = 1)#,
+                         #block_device_map = block_map)
   master_nodes = master_res.instances
   print "Launched master in %s, regid = %s" % (zone, master_res.id)
 
@@ -381,14 +389,21 @@ def setup_cluster(conn, master_nodes, slave_nodes, zoo_nodes, opts, deploy_ssh_k
     # setup-root-access.sh script enables it and also installs tools like git
     # which are required for setup to start.
     print "Enabling root access..."
+    print "Making sure wget is installed on master..."
+    ssh_user(master, opts, "sudo yum install -y -q wget", 'root')
     wget_cmd = "wget " + SETUP_BOOTSTRAP_URL
-    ssh_user(master, opts, wget_cmd, 'ec2-user')
-    ssh_user(master, opts, 'bash ./setup-root-access.sh', 'ec2-user')
+    print "Downloading setup_bootstrap script to master..."
+    ssh_user(master, opts, wget_cmd, opts.initial_user)
+    print "Running setup-root-access.sh on master..."
+    ssh_user(master, opts, 'bash ./setup-root-access.sh', opts.initial_user)
     slave_ips = [i.public_dns_name for i in slave_nodes]
     for slave in slave_ips:
-      print "Enabling root access at %s " % str(slave)
-      ssh_user(slave, opts, wget_cmd, 'ec2-user')
-      ssh_user(slave, opts, 'bash ./setup-root-access.sh', 'ec2-user')
+       print "Enabling root access at %s " % str(slave)
+       print "Making sure wget is installed on %s..." % str(slave)
+       ssh_user(slave, opts, "sudo yum install -y -q wget", opts.initial_user)
+       print "Downloading setup_bootstrap script to %s..." % str(slave)
+       ssh_user(slave, opts, wget_cmd, opts.initial_user)
+       ssh_user(slave, opts, 'bash ./setup-root-access.sh', opts.initial_user)
 
     print "Copying SSH key %s to master..." % opts.identity_file
     ssh(master, opts, 'mkdir -p ~/.ssh')
@@ -406,7 +421,7 @@ def setup_cluster(conn, master_nodes, slave_nodes, zoo_nodes, opts, deploy_ssh_k
   if not opts.mesos_scripts:
     # NOTE: We should clone the repository before running deploy_files to
     # prevent ec2-variables.sh from being overwritten
-    ssh(master, opts, "rm -rf spark-ec2 && git clone -b from-scratch https://github.com/shivaram/spark-ec2.git")
+    ssh(master, opts, "rm -rf spark-ec2 && git clone -b from-scratch https://github.com/andyk/spark-ec2.git")
 
   print "Deploying files to master..."
   deploy_files(conn, "deploy.generic", opts, master_nodes, slave_nodes,
@@ -584,7 +599,9 @@ def get_partition(total, num_partitions, current_partitions):
 def main():
   (opts, action, cluster_name) = parse_args()
   try:
-    conn = ec2.connect_to_region(opts.region)
+    # conn = ec2.connect_to_region(opts.region)
+    #conn = boto.connect_euca('10.123.1.142', api_version=EC2_API_VERSION)
+    conn = boto.connect_euca('10.123.1.142')
   except Exception as e:
     print >> stderr, (e)
     sys.exit(1)
