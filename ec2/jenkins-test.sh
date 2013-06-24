@@ -20,8 +20,11 @@
 # a distributed test. We put this here instead of in the jenkins project
 # configuration so that it can be tracked via SVC.
 
+
 # Shut down any nodes that are currently running under the "andy" keypair
-for i in `euca-describe-instances|grep running|grep andy|cut -f2`; do euca-terminate-instances $i; done
+for i in `euca-describe-instances|grep running|grep andy|cut -f2`; do
+  euca-terminate-instances $i
+done
 
 function update_num_running {
   ALL_RUNNING=`euca-describe-instances|grep andy|grep running|wc -l`
@@ -38,10 +41,7 @@ while [[ $NUM_RUNNING > 0 ]]; do
   sleep 5
 done
 
-#TODO(andyk): These can probably be replaced with rm ~/.ssh/known_hosts on a jenkins slave box.
-sed -i.backup '/10.123.1.22/d' ~/.ssh/known_hosts
-sed -i.backup '/10.123.1.23/d' ~/.ssh/known_hosts 
-cat /root/.ssh/known_hosts
+rm -rf ~/.ssh/known_hosts
 ./ec2/spark-ec2 --ami emi-EDB63CA9 -i ~/andy.pem -k andy -s 1 -w 40 --initial-user root --cluster-type standalone launch jenkins-test-cluster
 
 # ssh into the master and run a spark example job
