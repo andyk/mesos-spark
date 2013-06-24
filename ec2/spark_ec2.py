@@ -574,8 +574,12 @@ def ssh(host, opts, command):
 
 # Run a command on a host through ssh, throwing an exception if ssh fails
 def ssh_user(host, opts, command, user):
+  # Using "-t -t" so that Jenkins can successfully run these scripts. Before
+  # it was just "-t" and we got the following error:
+  # Pseudo-terminal will not be allocated because stdin is not a terminal.
+  # sudo: sorry, you must have a tty to run sudo
   subprocess.check_call(
-      "ssh -t -o StrictHostKeyChecking=no -i %s %s@%s '%s'" %
+      "ssh -t -t -o StrictHostKeyChecking=no -i %s %s@%s '%s'" %
       (opts.identity_file, user, host, command), shell=True)
 
 
