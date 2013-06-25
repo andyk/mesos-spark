@@ -579,7 +579,7 @@ def ssh_user(host, opts, command, user):
   # Pseudo-terminal will not be allocated because stdin is not a terminal.
   # sudo: sorry, you must have a tty to run sudo
   subprocess.check_call(
-      "ssh -t -t -o StrictHostKeyChecking=no -i %s %s@%s '%s'" %
+      "ssh -t -o StrictHostKeyChecking=no -i %s %s@%s '%s'" %
       (opts.identity_file, user, host, command), shell=True)
 
 
