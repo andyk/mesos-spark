@@ -42,10 +42,19 @@ while [[ $NUM_RUNNING > 0 ]]; do
 done
 
 rm -rf ~/.ssh/known_hosts
-./ec2/spark-ec2 --ami emi-EDB63CA9 -i ~/andy.pem -k andy -s 1 -w 40 --initial-user root --cluster-type standalone launch jenkins-test-cluster
+./ec2/spark-ec2 --ami emi-EDB63CA9 -i ~/andy.pem -k andy -s 1 -w 40 --initial-user root --cluster-type standalone launch jenkins-test-cluster > spark-ec2-output
+
+# We use this instead of ./spark-ec2 get-master jenkins-test-cluster since
+# that functionality is currently broken in the port of spark_ec2.py to work
+# with eucalyptus - I think because we don't set up and use groups correctly.
+MASTER_IP=`grep "Master IP:" spark-ec2-output | cut -d " " -f3`
+
+# Get the master port by scraping it off of the standalone cluster web UI 
+MASTER_PORT=`curl $MASTER_IP:8080| grep "<title>Spark Master on " | sed -e 's/.*Spark Master on [^:]*:\([0-9]*\).*/\1/'`
 
 # ssh into the master and run a spark example job
-#TODO: implement me.
+ssh -t -t -o StrictHostKeyChecking=no -i ~/andy.pem root@$MASTER_IP 'pushd /root/spark/; ./run spark.examples.SparkLR spark://$MASTER_IP:$MASTER_PORT'
+# TODO(andyk):double check that SCALA_HOME is set up by the spark-ec2 setup scripts.
 
 # shut down the cluster
-#TODO: implement me.
+# TODO: implement me.
