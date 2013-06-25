@@ -385,7 +385,7 @@ def get_existing_cluster(conn, opts, cluster_name, die_on_error=True):
 def setup_cluster(conn, master_nodes, slave_nodes, zoo_nodes, opts, deploy_ssh_key):
   master = master_nodes[0].public_dns_name
   if deploy_ssh_key:
-    if opts.inital_user == "root":
+    if opts.initial_user == "root":
       sudo_cmd = ""
     else:
       sudo_cmd = "sudo "
