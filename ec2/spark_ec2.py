@@ -385,12 +385,16 @@ def get_existing_cluster(conn, opts, cluster_name, die_on_error=True):
 def setup_cluster(conn, master_nodes, slave_nodes, zoo_nodes, opts, deploy_ssh_key):
   master = master_nodes[0].public_dns_name
   if deploy_ssh_key:
+    if opts.inital_user == "root":
+      sudo_cmd = ""
+    else:
+      sudo_cmd = "sudo "
     # The default Amazon AMI disables remote root access. The
     # setup-root-access.sh script enables it and also installs tools like git
     # which are required for setup to start.
     print "Enabling root access..."
     print "Making sure wget is installed on master..."
-    ssh_user(master, opts, "sudo yum install -y -q wget", 'root')
+    ssh_user(master, opts, "%s yum install -y -q wget" % sudo_cmd, 'root')
     wget_cmd = "wget " + SETUP_BOOTSTRAP_URL
     print "Downloading setup_bootstrap script to master..."
     ssh_user(master, opts, wget_cmd, opts.initial_user)
@@ -400,7 +404,7 @@ def setup_cluster(conn, master_nodes, slave_nodes, zoo_nodes, opts, deploy_ssh_k
     for slave in slave_ips:
        print "Enabling root access at %s " % str(slave)
        print "Making sure wget is installed on %s..." % str(slave)
-       ssh_user(slave, opts, "sudo yum install -y -q wget", opts.initial_user)
+       ssh_user(slave, opts, "%s yum install -y -q wget" % sudo_cmd, opts.initial_user)
        print "Downloading setup_bootstrap script to %s..." % str(slave)
        ssh_user(slave, opts, wget_cmd, opts.initial_user)
        ssh_user(slave, opts, 'bash ./setup-root-access.sh', opts.initial_user)
@@ -574,10 +578,6 @@ def ssh(host, opts, command):
 
 # Run a command on a host through ssh, throwing an exception if ssh fails
 def ssh_user(host, opts, command, user):
-  # Using "-t -t" so that Jenkins can successfully run these scripts. Before
-  # it was just "-t" and we got the following error:
-  # Pseudo-terminal will not be allocated because stdin is not a terminal.
-  # sudo: sorry, you must have a tty to run sudo
   subprocess.check_call(
       "ssh -t -o StrictHostKeyChecking=no -i %s %s@%s '%s'" %
       (opts.identity_file, user, host, command), shell=True)
