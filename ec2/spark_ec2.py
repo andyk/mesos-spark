@@ -41,7 +41,8 @@ LATEST_AMI_URL = "https://s3.amazonaws.com/mesos-images/ids/latest-spark-0.6"
 EC2_API_VERSION = "2010-08-31"
 
 # Static url to a script used to bootstrap the setup process
-SETUP_BOOTSTRAP_URL = "https://raw.github.com/andyk/spark-ec2/from-scratch/setup-root-access.sh"
+BOOTSTRAP_SCRIPT="bootstrap-setup.sh"
+SETUP_BOOTSTRAP_URL="https://raw.github.com/andyk/spark-ec2/from-scratch/" + BOOTSTRAP_SCRIPT
 
 # Configure and parse our command-line arguments
 def parse_args():
@@ -395,17 +396,17 @@ def setup_cluster(conn, master_nodes, slave_nodes, zoo_nodes, opts, deploy_ssh_k
     wget_cmd = "wget " + SETUP_BOOTSTRAP_URL
     print "Making sure wget and git are installed on master..."
     ssh_user(master, opts, "%s yum install -y -q wget" % sudo_cmd, 'root')
-    print "Downloading and running bootstrap-setup.sh on master..."
+    print "Downloading and running %s on master..." % BOOTSTRAP_SCRIPT
     ssh_user(master, opts, wget_cmd, opts.initial_user)
-    ssh_user(master, opts, 'bash ./bootstap-setup.sh', opts.initial_user)
+    ssh_user(master, opts, 'bash ./%s' % BOOTSTRAP_SCRIPT, opts.initial_user)
     slave_ips = [i.public_dns_name for i in slave_nodes]
     for slave in slave_ips:
        print "Bootstrapping node %s." % str(slave)
        print "Making sure wget is installed on %s..." % str(slave)
        ssh_user(slave, opts, "%s yum install -y -q wget" % sudo_cmd, opts.initial_user)
-       print "Downloading and running bootstrap-setup.sh on %s..." % str(slave)
+       print "Downloading and running %s on %s..." % (BOOTSTRAP_SCRIPT, str(slave))
        ssh_user(slave, opts, wget_cmd, opts.initial_user)
-       ssh_user(slave, opts, 'bash ./bootstrap-setup.sh', opts.initial_user)
+       ssh_user(slave, opts, 'bash ./%s' % BOOTSTRAP_SCRIPT, opts.initial_user)
 
     print "Copying SSH key %s to master..." % opts.identity_file
     ssh(master, opts, 'mkdir -p ~/.ssh')
