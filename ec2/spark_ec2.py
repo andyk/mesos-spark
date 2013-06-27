@@ -385,29 +385,27 @@ def get_existing_cluster(conn, opts, cluster_name, die_on_error=True):
 def setup_cluster(conn, master_nodes, slave_nodes, zoo_nodes, opts, deploy_ssh_key):
   master = master_nodes[0].public_dns_name
   if deploy_ssh_key:
-    if opts.initial_user == "root":
-      sudo_cmd = ""
-    else:
+    if opts.initial_user != "root":
       sudo_cmd = "sudo "
+    else:
+      sudo_cmd = ""
     # The default Amazon AMI disables remote root access. The
     # setup-root-access.sh script enables it and also installs tools like git
     # which are required for setup to start.
-    print "Enabling root access..."
-    print "Making sure wget is installed on master..."
-    ssh_user(master, opts, "%s yum install -y -q wget" % sudo_cmd, 'root')
     wget_cmd = "wget " + SETUP_BOOTSTRAP_URL
-    print "Downloading setup_bootstrap script to master..."
+    print "Making sure wget and git are installed on master..."
+    ssh_user(master, opts, "%s yum install -y -q wget" % sudo_cmd, 'root')
+    print "Downloading and running bootstrap-setup.sh on master..."
     ssh_user(master, opts, wget_cmd, opts.initial_user)
-    print "Running setup-root-access.sh on master..."
-    ssh_user(master, opts, 'bash ./setup-root-access.sh', opts.initial_user)
+    ssh_user(master, opts, 'bash ./bootstap-setup.sh', opts.initial_user)
     slave_ips = [i.public_dns_name for i in slave_nodes]
     for slave in slave_ips:
-       print "Enabling root access at %s " % str(slave)
+       print "Bootstrapping node %s." % str(slave)
        print "Making sure wget is installed on %s..." % str(slave)
        ssh_user(slave, opts, "%s yum install -y -q wget" % sudo_cmd, opts.initial_user)
-       print "Downloading setup_bootstrap script to %s..." % str(slave)
+       print "Downloading and running bootstrap-setup.sh on %s..." % str(slave)
        ssh_user(slave, opts, wget_cmd, opts.initial_user)
-       ssh_user(slave, opts, 'bash ./setup-root-access.sh', opts.initial_user)
+       ssh_user(slave, opts, 'bash ./bootstrap-setup.sh', opts.initial_user)
 
     print "Copying SSH key %s to master..." % opts.identity_file
     ssh(master, opts, 'mkdir -p ~/.ssh')
